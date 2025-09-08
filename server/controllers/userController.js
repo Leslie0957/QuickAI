@@ -14,7 +14,6 @@ export const getUserCreations = async (req, res) => {
 
 export const getPublishedCreations = async (req, res) => {
     try {
-
         const creations = await sql`SELECT * FROM creations WHERE publish = true ORDER BY created_at DESC`;
         res.json({success: true, creations})
 
@@ -27,7 +26,7 @@ export const toggleLikeCreation = async (req, res) => {
     try {
 
         const {userId} = req.auth()
-        const {id} = req.body //why
+        const {id} = req.body // creation id
 
         const [creation] = await sql`SELECT * FROM creations WHERE id = ${id}`
 
@@ -47,7 +46,7 @@ export const toggleLikeCreation = async (req, res) => {
             updatedLikes = [...currentLikes, userIdStr]
             message = 'Creation Liked'
         }
-        // 为什么要加这个引号
+        // PostgreSQL的数组存储要求‘{，，}’
         const formattedArray = `{${updatedLikes.join(',')}}`
         
         await sql`UPDATE creations SET likes = ${formattedArray}::text[] WHERE id = ${id}`

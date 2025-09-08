@@ -24,6 +24,7 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      "react/jsx-no-undef": ["error", { "allowGlobals": true }],
     },
   },
 ])
