@@ -37,8 +37,9 @@ const RemoveObject = () => {
       }
     } catch (error) {
       toast.error(error.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
   
   return (
@@ -57,7 +58,7 @@ const RemoveObject = () => {
         <p className='mt-6 text-sm font-medium'>Describe object name to remove</p>
         <textarea onChange={(e)=>setObject(e.target.value)} value={object} rows={4} className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300' placeholder='e.g., watch or spoon, only single object name' required/>
 
-        <button setLoading={loading} className='w-full flex justify-center items-center gap-2 bg-gradient-to-r from-[#417DF6] to-[#8E37EB] text-white px-4 py-2 mt-6 text-sm rounded-lg cursor-pointer'>
+        <button disabled={loading} className='w-full flex justify-center items-center gap-2 bg-gradient-to-r from-[#417DF6] to-[#8E37EB] text-white px-4 py-2 mt-6 text-sm rounded-lg cursor-pointer'>
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> : <Scissors className='w-5'/>}
           Remove object
         </button>
