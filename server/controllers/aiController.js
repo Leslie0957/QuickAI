@@ -32,12 +32,6 @@ export const generateArticle = async (req, res)=>{
             ],
             temperature: 0.7,
             max_tokens: length,
-
-
-
-
-
-            
         });
 
         const content = response.choices[0].message.content
@@ -115,7 +109,7 @@ export const generateImage = async (req, res)=>{
             headers: {'x-api-key': process.env.CLIPDROP_API_KEY,},
             responseType: "arraybuffer",
         })
-        // 不能随意有空格
+        // API返回的二进制ArrayBuffer 需要转换为Base64格式上传使得接口能识别解析
         const base64Image = `data:image/png;base64,${Buffer.from(data, 'binary').toString('base64')}`;
 
         const {secure_url} = await cloudinary.uploader.upload(base64Image)

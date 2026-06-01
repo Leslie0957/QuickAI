@@ -1,5 +1,6 @@
 import { Eraser, Sparkles } from 'lucide-react';
 import React, { useState } from 'react'
+import toast from 'react-hot-toast'
 import axios from 'axios'
 import { useAuth } from '@clerk/clerk-react';
 
@@ -35,7 +36,7 @@ const RemoveBackground = () => {
   }
 
   return (
-    <div className='h-full overflow-y0yscroll p-6 flex items-start flex-wrap gap-4 text-slate-700'>
+    <div className='h-full overflow-y-scroll p-6 flex items-start flex-wrap gap-4 text-slate-700'>
       {/* left col */}
       <form onSubmit={onSubmitHandler} className='w-full max-w-lg p-4 bg-white rounded-lg border border-gray-200'>
         <div className='flex items-center gap-3'>
@@ -63,7 +64,7 @@ const RemoveBackground = () => {
             <div className='flex-1 flex justify-center items-center'>
               <div className='text-sm flex flex-col items-center gap-5 text-gray-400'>
                 <Eraser className='w-9 h-9'/>
-                <p>Upload an image and click "Remove Background" to get started</p>
+                <p>Upload an image and click "Remove background" to get started</p>
               </div>
             </div>
             ) : (
