@@ -12,6 +12,7 @@ await connectCloudinary()
 
 app.use(cors())
 app.use(express.json())
+app.use((req, res, next) => { res.set('X-QuickAI-Request-Path', req.originalUrl); next() })
 // 添加之后 对于每个请求都会使用req.auth，从而能够获取用户数据
 app.use(clerkMiddleware())
 
