@@ -12,89 +12,96 @@ const AI =
     baseURL: "https://api.deepseek.com"
 });
 
-export const generateArticle = async (req, res)=>{
-    try {
-        const {userId} = req.auth();
-        const { prompt, length } = req.body;
-        const plan = req.plan;
-        const free_usage = req.free_usage;
-
-        if(plan !== 'premium' && free_usage >= 10){
-            return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
-        }
-
-        const response = await AI.chat.completions.create({
-            model: "deepseek-chat",
-            messages: [{
-                    role: "user",
-                    content: prompt,
-                },
-            ],
-            temperature: 0.7,
-            max_tokens: length,
-        });
-
-        const content = response.choices[0].message.content
-
-        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${content}, 'article')`;
-
-        if(plan !== 'premium'){
-            await clerkClient.users.updateUserMetadata(userId,{
-                privateMetadata:{
-                    free_usage: free_usage + 1
-                }
-            } )
-        }
-
-        res.json({ success: true, content})
-        
-    } catch (error) {
-        console.log(error.message)
-        res.json({ success: false, message: error.message})
+const sendEvent = (res, event, data) => {
+    if (!res.writableEnded && !res.destroyed) {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
     }
 }
 
-export const generateBlogTitle = async (req, res)=>{
+const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage }) => {
+    const { userId } = req.auth()
+    const { prompt } = req.body
+    const plan = req.plan
+    const freeUsage = req.free_usage
+
+    if (plan !== 'premium' && freeUsage >= 10) {
+        return res.json({ success: false, message: "Limit reached. Upgrade to continue." })
+    }
+
+    const abortController = new AbortController()
+    let disconnected = false
+    res.on('close', () => {
+        if (!res.writableEnded) {
+            disconnected = true
+            abortController.abort()
+        }
+    })
+
+    res.set({
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no'
+    })
+    res.flushHeaders()
+
     try {
-        const {userId} = req.auth();
-        const { prompt } = req.body;
-        const plan = req.plan;
-        const free_usage = req.free_usage;
-
-        if(plan !== 'premium' && free_usage >= 10){
-            return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
-        }
-
-        const response = await AI.chat.completions.create({
-            model: "deepseek-chat",
-            messages: [{role: "user", content: prompt, } ],
+        const stream = await AI.chat.completions.create({
+            model: 'deepseek-chat',
+            messages: [{ role: 'user', content: prompt }],
             temperature: 0.7,
-            max_tokens: 400,
-        });
+            max_tokens: maxTokens,
+            stream: true,
+        }, { signal: abortController.signal })
 
-        const choice = response.choices[0]
-        if(choice.finish_reason === 'length'){
-            return res.json({ success: false, message: "Title generation was cut off. Please try again." })
-        }
-        const content = choice.message.content
-
-        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${content}, 'blog-title')`;
-
-        if(plan !== 'premium'){
-            await clerkClient.users.updateUserMetadata(userId,{
-                privateMetadata:{
-                    free_usage: free_usage + 1
-                }
-            } )
+        let content = ''
+        let finishReason
+        for await (const chunk of stream) {
+            if (disconnected) return
+            const choice = chunk.choices[0]
+            const text = choice?.delta?.content
+            if (text) {
+                content += text
+                sendEvent(res, 'chunk', { text })
+            }
+            if (choice?.finish_reason) finishReason = choice.finish_reason
         }
 
-        res.json({ success: true, content})
-        
+        if (disconnected) return
+        if (finishReason === 'length') throw new Error(truncatedMessage)
+        if (!content.trim() || finishReason !== 'stop') {
+            throw new Error('Generation did not complete. Please try again.')
+        }
+
+        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${content}, ${type})`
+
+        if (plan !== 'premium') {
+            await clerkClient.users.updateUserMetadata(userId, {
+                privateMetadata: { free_usage: freeUsage + 1 }
+            })
+        }
+
+        sendEvent(res, 'done', {})
     } catch (error) {
-        console.log(error.message)
-        res.json({ success: false, message: error.message})
+        if (!disconnected) {
+            console.error(error)
+            sendEvent(res, 'error', { message: error.message || 'Generation failed.' })
+        }
+    } finally {
+        if (!res.writableEnded) res.end()
     }
 }
+
+export const generateArticle = (req, res) => streamTextCreation(req, res, {
+    maxTokens: Math.min(Math.max(Number(req.body.length) || 800, 800) * 2, 3200),
+    type: 'article',
+    truncatedMessage: 'Article generation was cut off. Please try again.'
+})
+
+export const generateBlogTitle = (req, res) => streamTextCreation(req, res, {
+    maxTokens: 400,
+    type: 'blog-title',
+    truncatedMessage: 'Title generation was cut off. Please try again.'
+})
 
 // 只有付费用户才能使用接下来的功能
 export const generateImage = async (req, res)=>{

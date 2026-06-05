@@ -1,12 +1,10 @@
 import { useAuth } from '@clerk/clerk-react'
 import { Hash, Sparkles } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
-import axios from 'axios'
-
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
+import { streamCreation } from '../utils/streamCreation'
 
 const BlogTitles = () => {
 
@@ -16,25 +14,36 @@ const BlogTitles = () => {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
+  const abortRef = useRef(null)
+
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const { getToken } = useAuth()
 
   const onSubmitHandler = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoading(true)
+    setContent('')
     try {
-      setLoading(true)
       const prompt = `Generate 5 concise blog titles for the keyword "${input}" in the ${selectedCategory} category. Return only a numbered list, without an introduction or bold formatting.`
-      const { data } = await axios.post('/api/ai/generate-blog-title', { prompt }, { headers: { Authorization: `Bearer ${await getToken()}` } })
-
-      if (data.success) {
-        setContent(data.content)
-      } else {
-        toast.error(data.message)
-      }
+      await streamCreation({
+        path: '/api/ai/generate-blog-title',
+        prompt,
+        token: await getToken(),
+        signal: controller.signal,
+        onChunk: (text) => setContent((current) => current + text),
+      })
     } catch (error) {
-      toast.error(error.message)
+      if (error.name !== 'AbortError') {
+        setContent('')
+        toast.error(error.message)
+      }
+    } finally {
+      abortRef.current = null
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -78,9 +87,9 @@ const BlogTitles = () => {
             </div>
           ) : (
             <div className='mt-3 h-full overflow-y-scroll text-sm text-slate-600'>
-              <div className='reset-tw'>
-                <Markdown>{content}</Markdown>
-              </div>
+              {loading ? <div className='whitespace-pre-wrap'>{content}</div> : (
+                <div className='reset-tw'><Markdown>{content}</Markdown></div>
+              )}
             </div>
           )
         }
