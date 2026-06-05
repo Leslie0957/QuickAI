@@ -8,7 +8,8 @@ const baseUrl = 'https://example.test'
 function responseFromParts(parts) {
   return new Response(new ReadableStream({
     start(controller) {
-      for (const part of parts) controller.enqueue(encoder.encode(part))
+      const bytes = encoder.encode(parts.join(''))
+      for (let i = 0; i < bytes.length; i += 3) controller.enqueue(bytes.slice(i, i + 3))
       controller.close()
     },
   }), { headers: { 'Content-Type': 'text/event-stream' } })
@@ -37,6 +38,7 @@ test('reads split SSE frames and Unicode chunks in order', async () => {
     assert.deepEqual(chunks, ['你好', ' world'])
     assert.equal(calledUrl, 'https://example.test/api/ai/generate-article')
     assert.equal(calledOptions.headers.Authorization, 'Bearer test-token')
+    assert.equal(calledOptions.headers.Accept, 'text/event-stream')
     assert.deepEqual(JSON.parse(calledOptions.body), { prompt: 'test', length: 800 })
   } finally {
     globalThis.fetch = originalFetch
