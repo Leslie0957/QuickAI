@@ -57,8 +57,13 @@ const Community = () => {
     <div className='flex-1 h-full flex flex-col gap-4 p-6'>
       Creations
       <div className='bg-white h-full w-full rounded-xl overflow-y-scroll'>
-        {creations.map((creation, index)=> (
-          <div key={index} className='relative group inline-block pl-3 pt-3 w-full sm:max-w-1/2 lg:max-w-1/3'>
+        {creations.length === 0 && (
+          <div className='flex h-full items-center justify-center px-4 text-center text-sm text-gray-500'>
+            No public images yet. Images shared with “Make this image Public” will appear here.
+          </div>
+        )}
+        {creations.map((creation)=> (
+          <div key={creation.id} className='relative group inline-block pl-3 pt-3 w-full sm:max-w-1/2 lg:max-w-1/3'>
             <img src={creation.content} alt="" className='w-full h-full object-cover rounded-lg'/>
             
             <div className='absolute bottom-0 top-0 right-0 left-3 flex gap-2 items-end justify-end group-hover:justify-between p-3 group-hover:bg-gradient-to-b from-transparent to-black/80 text-white rounded-lg'>
