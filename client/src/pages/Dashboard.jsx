@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Gem, Sparkles } from 'lucide-react'
 import { Protect, useAuth } from '@clerk/clerk-react'
 import CreationItem from '../components/CreationItem'
@@ -12,6 +12,8 @@ let dashboardCache = null
 const Dashboard = () => {
   
   const { getToken, userId } = useAuth()
+  const getTokenRef = useRef(getToken)
+  useEffect(() => { getTokenRef.current = getToken }, [getToken])
   const cachedCreations = dashboardCache?.userId === userId ? dashboardCache.creations : null
   const [creations, setCreations] = useState(cachedCreations ?? [])
   const [loading, setLoading] = useState(!cachedCreations)
@@ -23,7 +25,7 @@ const Dashboard = () => {
     const getDashboardData = async () => {
       try {
         const { data } = await axios.get('/api/user/get-user-creations', {
-          headers: { Authorization: `Bearer ${await getToken()}` }
+          headers: { Authorization: `Bearer ${await getTokenRef.current()}` }
         })
         if (!active) return
         if (data.success) {
@@ -41,8 +43,29 @@ const Dashboard = () => {
 
     getDashboardData()
     return () => { active = false }
-  }, [getToken, userId])
-   
+  }, [userId])
+
+  const onPublishChange = async (item) => {
+    try {
+      const { data } = await axios.post('/api/user/set-creation-publish',
+        { id: item.id, publish: !item.publish },
+        { headers: { Authorization: `Bearer ${await getTokenRef.current()}` } }
+      )
+      if (!data.success) throw new Error(data.message)
+
+      setCreations((current) => {
+        const updated = current.map((creation) =>
+          creation.id === item.id ? { ...creation, publish: data.creation.publish } : creation
+        )
+        dashboardCache = { userId, creations: updated }
+        return updated
+      })
+      toast.success(data.creation.publish ? 'Shared to Community' : 'Removed from Community')
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message)
+    }
+  }
+
   return (
     <div className='h-full overflow-y-scroll p-6'>
       <div className='flex justify-start gap-4 flex-wrap'>
@@ -83,7 +106,7 @@ const Dashboard = () => {
         <div className='space-y-3'>
           <p className='mt-6 mb-4'>Recent Creations</p>
           {
-            creations.map((item)=> <CreationItem key={item.id} item={item}/>)
+            creations.map((item)=> <CreationItem key={item.id} item={item} onPublishChange={onPublishChange}/>)
           }
         </div>
         )
