@@ -1,5 +1,5 @@
 import { Edit, Sparkles } from 'lucide-react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
@@ -18,8 +18,14 @@ const WriteArticle = () => {
   const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
   const abortRef = useRef(null)
+  const outputRef = useRef(null)
 
   useEffect(() => () => abortRef.current?.abort(), [])
+  useLayoutEffect(() => {
+    if (loading && outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight
+    }
+  }, [content, loading])
 
   const {getToken} = useAuth()
 
@@ -94,10 +100,8 @@ const WriteArticle = () => {
             </div>
           </div>
           ) : (
-            <div className='mt-3 h-full overflow-y-scroll text-sm text-slate-600'>
-              {loading ? <div className='whitespace-pre-wrap'>{content}</div> : (
-                <div className='reset-tw'><Markdown>{content}</Markdown></div>
-              )}
+            <div ref={outputRef} className='mt-3 flex-1 min-h-0 overflow-y-auto text-sm text-slate-600'>
+              <div className='reset-tw'><Markdown>{content}</Markdown></div>
             </div>
           )}
           
