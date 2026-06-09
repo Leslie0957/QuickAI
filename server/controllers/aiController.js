@@ -5,6 +5,7 @@ import {v2 as cloudinary} from 'cloudinary';
 import axios from "axios";
 import fs from 'fs'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
+import { DAILY_IMAGE_LIMIT, currentQuotaDay, getRemainingImages, releaseImage, reserveImage } from '../services/imageQuota.js'
 
 const AI =
  new OpenAI({
@@ -127,38 +128,88 @@ export const generateBlogTitle = (req, res) => streamTextCreation(req, res, {
     truncatedMessage: 'Title generation was cut off. Please try again.'
 })
 
-// 只有付费用户才能使用接下来的功能
-export const generateImage = async (req, res)=>{
+export const getImageQuota = async (req, res) => {
     try {
-        const {userId} = req.auth();
-        const { prompt, publish } = req.body;
-        const plan = req.plan;
-
-        if(plan !== 'premium'){
-            return res.json({ success: false, message: "This feature is only avaliable for premium subscriptions."})
-        }
-
-        const formData = new FormData()
-        formData.append('prompt', prompt)
-        const {data} = await axios.post("https://clipdrop-api.co/text-to-image/v1", formData, {
-            headers: {'x-api-key': process.env.CLIPDROP_API_KEY,},
-            responseType: "arraybuffer",
-        })
-        // API返回的二进制ArrayBuffer 需要转换为Base64格式上传使得接口能识别解析
-        const base64Image = `data:image/png;base64,${Buffer.from(data, 'binary').toString('base64')}`;
-
-        const {secure_url} = await cloudinary.uploader.upload(base64Image)
-
-        await sql`INSERT INTO creations (user_id, prompt, content, type, publish) VALUES (${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})`;
-
-        res.json({ success: true, content: secure_url})
-        
+        const day = currentQuotaDay()
+        const remaining = await getRemainingImages(req.auth().userId, day)
+        const resetsAt = new Date(Date.parse(`${day}T00:00:00.000Z`) + 86400000).toISOString()
+        res.json({ success: true, limit: DAILY_IMAGE_LIMIT, remaining, resetsAt })
     } catch (error) {
-        console.log(error.message)
-        res.json({ success: false, message: error.message})
+        console.error('Image quota lookup failed:', error.message)
+        res.status(500).json({ success: false, message: 'Could not load image quota.' })
     }
 }
 
+export const generateImage = async (req, res) => {
+    const { userId } = req.auth()
+    const { prompt, publish = false } = req.body || {}
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 2048 || typeof publish !== 'boolean') {
+        return res.status(400).json({ success: false, message: 'Enter an image description (up to 2048 characters).' })
+    }
+    const { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } = process.env
+    if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+        return res.status(503).json({ success: false, message: 'Image generation is not configured yet.' })
+    }
+
+    const day = currentQuotaDay()
+    let reserved = false
+    let saved = false
+    let stage = 'quota'
+    try {
+        const remaining = await reserveImage(userId, day)
+        if (remaining === null) {
+            return res.status(429).json({ success: false, remaining: 0, message: 'Daily limit reached. You can generate 10 images per day.' })
+        }
+        reserved = true
+
+        stage = 'provider'
+        const { data } = await axios.post(
+            `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+            { prompt: prompt.trim() },
+            {
+                headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}` },
+                timeout: 90000,
+            }
+        )
+        if (!data?.success || !data.result?.image) {
+            throw new Error('Image provider returned no image.')
+        }
+
+        stage = 'storage'
+        const { secure_url } = await cloudinary.uploader.upload(`data:image/jpeg;base64,${data.result.image}`)
+        stage = 'database'
+        await sql`
+            INSERT INTO creations (user_id, prompt, content, type, publish)
+            VALUES (${userId}, ${prompt.trim()}, ${secure_url}, 'image', ${publish})
+        `
+        saved = true
+        res.json({ success: true, content: secure_url, remaining })
+    } catch (error) {
+        if (reserved && !saved) {
+            try {
+                await releaseImage(userId, day)
+            } catch (releaseError) {
+                console.error('Image quota release failed:', releaseError.message)
+            }
+        }
+        console.error(`Image generation failed at ${stage}:`, error.response?.status, error.message)
+        if (stage === 'quota') {
+            return res.status(500).json({ success: false, message: 'Could not check your image quota. Please try again.' })
+        }
+        if (stage === 'provider') {
+            const providerStatus = error.response?.status
+            const message = providerStatus === 429
+                ? 'Image service is busy. Please try again later.'
+                : providerStatus === 401 || providerStatus === 403
+                    ? 'Image service credentials need to be checked.'
+                    : 'Image generation failed. Please try again.'
+            return res.status(502).json({ success: false, message })
+        }
+        res.status(500).json({ success: false, message: 'Could not save the generated image. Please try again.' })
+    }
+}
+
+// 只有付费用户才能使用接下来的功能
 export const removeImageBackground = async (req, res)=>{
     try {
         const {userId} = req.auth();
