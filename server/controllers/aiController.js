@@ -6,6 +6,7 @@ import axios from "axios";
 import fs from 'fs'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
 import { DAILY_IMAGE_LIMIT, currentQuotaDay, getRemainingImages, releaseImage, reserveImage } from '../services/imageQuota.js'
+import { syncPublicProfile } from '../services/publicProfiles.js'
 
 const AI =
  new OpenAI({
@@ -183,6 +184,7 @@ export const generateImage = async (req, res) => {
             VALUES (${userId}, ${prompt.trim()}, ${secure_url}, 'image', ${publish})
         `
         saved = true
+        if (publish) await syncPublicProfile(userId)
         res.json({ success: true, content: secure_url, remaining })
     } catch (error) {
         if (reserved && !saved) {
