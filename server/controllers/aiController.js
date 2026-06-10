@@ -20,9 +20,8 @@ const sendEvent = (res, event, data) => {
     }
 }
 
-const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage }) => {
+const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage, prompt = req.body.prompt, storedPrompt = prompt }) => {
     const { userId } = req.auth()
-    const { prompt } = req.body
     const plan = req.plan
     const freeUsage = req.free_usage
 
@@ -31,7 +30,7 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage 
     }
 
     const saveCreation = async (content) => {
-        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${content}, ${type})`
+        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${storedPrompt}, ${content}, ${type})`
         if (plan !== 'premium') {
             await clerkClient.users.updateUserMetadata(userId, {
                 privateMetadata: { free_usage: freeUsage + 1 }
@@ -269,45 +268,43 @@ export const removeImageObject = async (req, res)=>{
     }
 }
 
-export const resumeReview = async (req, res)=>{
+export const resumeReview = async (req, res) => {
+    const resume = req.file
     try {
-        const {userId} = req.auth();
-        const resume = req.file;
-        const plan = req.plan;
-
-        if(plan !== 'premium'){
-            return res.json({ success: false, message: "This feature is only avaliable for premium subscriptions."})
+        if (req.plan !== 'premium') {
+            return res.status(403).json({ success: false, message: 'This feature is only available for premium subscriptions.' })
         }
-
-        if(resume.size > 5 * 1024 * 1024){
-            return res.json({success: false, message: "Resume file size exceeds allowed size (5MB)."})
+        if (!resume) {
+            return res.status(400).json({ success: false, message: 'Please upload a PDF resume.' })
         }
-
-        const dataBuffer = fs.readFileSync(resume.path)
+        if (resume.size > 5 * 1024 * 1024) {
+            return res.status(400).json({ success: false, message: 'Resume file size exceeds allowed size (5MB).' })
+        }
+        if (resume.mimetype !== 'application/pdf') {
+            return res.status(400).json({ success: false, message: 'Only PDF resumes are supported.' })
+        }
+        const dataBuffer = await fs.promises.readFile(resume.path)
         const pdfData = await pdf(dataBuffer)
-
-        const prompt = `Review the following resume and provide constructive feedback on its strengths, weakness, and areas for improvement. Resume Content:\n\n${pdfData.text}`
-
-        const response = await AI.chat.completions.create({
-            model: "deepseek-chat",
-            messages: [{
-                    role: "user",
-                    content: prompt,
-                },
-            ],
-            temperature: 0.7,
-            max_tokens: 1000,
-        });
-
-        const content = response.choices[0].message.content
-
-
-        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'Review the uploaded resume', ${content}, 'resume-review')`;
-
-        res.json({ success: true, content})
-        
+        if (!pdfData.text?.trim()) {
+            return res.status(400).json({ success: false, message: 'No readable text found. Please upload a text-based PDF.' })
+        }
+        if (res.destroyed) return
+        const prompt = `Review the following resume and provide constructive feedback on its strengths, weaknesses, and areas for improvement. Resume Content:\n\n${pdfData.text}`
+        await streamTextCreation(req, res, {
+            prompt,
+            storedPrompt: 'Review the uploaded resume',
+            maxTokens: 3200,
+            type: 'resume-review',
+            truncatedMessage: 'Resume review was cut off. Please try again.',
+        })
     } catch (error) {
-        console.log(error.message)
-        res.json({ success: false, message: error.message})
+        console.error('Resume review failed:', error.message)
+        if (!res.headersSent) {
+            res.status(400).json({ success: false, message: 'Could not read the PDF resume. Please upload a valid PDF.' })
+        }
+    } finally {
+        if (resume?.path) {
+            await fs.promises.unlink(resume.path).catch(() => {})
+        }
     }
 }

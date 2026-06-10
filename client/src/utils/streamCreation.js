@@ -1,12 +1,12 @@
-export async function streamCreation({ path, prompt, length, token, signal, onChunk, baseUrl = import.meta.env.VITE_BASE_URL }) {
+export async function streamCreation({ path, prompt, length, formData, token, signal, onChunk, baseUrl = import.meta.env.VITE_BASE_URL }) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      ...(formData ? {} : { 'Content-Type': 'application/json' }),
       Accept: 'text/event-stream',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(length === undefined ? { prompt } : { prompt, length }),
+    body: formData ?? JSON.stringify(length === undefined ? { prompt } : { prompt, length }),
     signal,
   })
 

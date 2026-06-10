@@ -88,3 +88,29 @@ test('keeps the existing JSON limit error', async () => {
     globalThis.fetch = originalFetch
   }
 })
+
+const options = { path: '/resume-review', token: 'test-token', baseUrl: 'https://example.test', onChunk: () => {} }
+
+test('multipart upload preserves browser boundary and decodes fragmented SSE', async () => {
+  const original = globalThis.fetch
+  const formData = new FormData()
+  formData.append('resume', new Blob(['%PDF-test'], { type: 'application/pdf' }), 'resume.pdf')
+  const chunks = []
+  globalThis.fetch = async (_url, request) => {
+    assert.equal(request.body, formData)
+    assert.equal(request.headers['Content-Type'], undefined)
+    assert.equal(request.headers.Accept, 'text/event-stream')
+    const bytes = new TextEncoder().encode('event: chunk\ndata: {"text":"中文"}\n\nevent: done\ndata: {}\n\n')
+    return new Response(new ReadableStream({
+      start(controller) {
+        for (const byte of bytes) controller.enqueue(new Uint8Array([byte]))
+        controller.close()
+      },
+    }), { headers: { 'Content-Type': 'text/event-stream' } })
+  }
+  try {
+    await streamCreation({ ...options, formData, onChunk: (text) => chunks.push(text) })
+    assert.equal(chunks.join(''), '中文')
+  } finally { globalThis.fetch = original }
+})
+
