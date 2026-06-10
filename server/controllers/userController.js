@@ -15,7 +15,7 @@ const decodeCursor = (value) => {
     }
 }
 
-const encodeCursor = (row) => Buffer.from(JSON.stringify([new Date(row.created_at).toISOString(), row.id])).toString('base64url')
+const encodeCursor = (row) => Buffer.from(JSON.stringify([row.cursor_created_at, row.id])).toString('base64url')
 
 export const getUserCreations = async (req, res) => {
     try {
@@ -37,7 +37,7 @@ export const getPublishedCreations = async (req, res) => {
 
         const rows = cursor
             ? await sql`
-                SELECT c.id, c.user_id, c.prompt, c.content, c.created_at,
+                SELECT c.id, c.user_id, c.prompt, c.content, c.created_at, c.created_at::text AS cursor_created_at,
                     COALESCE(cardinality(c.likes), 0) AS like_count,
                     ${userId} = ANY(COALESCE(c.likes, ARRAY[]::text[])) AS liked_by_me,
                     p.user_id AS profile_user_id, p.display_name AS author_name, p.image_url AS author_image_url
@@ -48,7 +48,7 @@ export const getPublishedCreations = async (req, res) => {
                 LIMIT ${COMMUNITY_PAGE_SIZE + 1}
             `
             : await sql`
-                SELECT c.id, c.user_id, c.prompt, c.content, c.created_at,
+                SELECT c.id, c.user_id, c.prompt, c.content, c.created_at, c.created_at::text AS cursor_created_at,
                     COALESCE(cardinality(c.likes), 0) AS like_count,
                     ${userId} = ANY(COALESCE(c.likes, ARRAY[]::text[])) AS liked_by_me,
                     p.user_id AS profile_user_id, p.display_name AS author_name, p.image_url AS author_image_url
@@ -60,7 +60,7 @@ export const getPublishedCreations = async (req, res) => {
 
         const hasMore = rows.length > COMMUNITY_PAGE_SIZE
         const page = await fillMissingProfiles(rows.slice(0, COMMUNITY_PAGE_SIZE))
-        const creations = page.map(({ profile_user_id, ...creation }) => ({
+        const creations = page.map(({ profile_user_id, cursor_created_at, ...creation }) => ({
             ...creation,
             author_name: creation.author_name || 'Member',
             author_image_url: creation.author_image_url || null,
