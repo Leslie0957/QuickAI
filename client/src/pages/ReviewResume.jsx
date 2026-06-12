@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { streamCreation } from '../utils/streamCreation'
 import { useAuth } from '@clerk/clerk-react';
 import Markdown from 'react-markdown';
+import FilePicker from '../components/FilePicker'
 
 
 
@@ -70,7 +71,7 @@ const ReviewResume = () => {
           <h1 className='text-xl font-semibold'>Resume Review</h1>
         </div>
         <p className='mt-6 text-sm font-medium'>Upload Resume</p>
-        <input onChange={(e)=>setInput(e.target.files[0])}  type="file" accept='application/pdf' className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300 text-gray-600 cursor-pointer file:cursor-pointer hover:border-gray-400 transition-colors' placeholder='The future of artificial intelligence' required/>
+        <FilePicker label='Upload resume' accept='application/pdf' file={input} onChange={(e)=>setInput(e.target.files[0])} />
 
         <p className='text-xs text-gray-500 font-light mt-1'>Supports PDF resume only (up to 5MB).</p>
 

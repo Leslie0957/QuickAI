@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import { useAuth } from '@clerk/clerk-react';
+import FilePicker from '../components/FilePicker'
 
 axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
 
@@ -44,7 +45,7 @@ const RemoveBackground = () => {
           <h1 className='text-xl font-semibold'>Background Removal</h1>
         </div>
         <p className='mt-6 text-sm font-medium'>Upload image</p>
-        <input onChange={(e)=>setInput(e.target.files[0])}  type="file" accept='image/*' className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300 text-gray-600 cursor-pointer file:cursor-pointer hover:border-gray-400 transition-colors' placeholder='The future of artificial intelligence' required/>
+        <FilePicker label='Upload image' accept='image/*' file={input} onChange={(e)=>setInput(e.target.files[0])} />
 
         <p className='text-xs text-gray-500 font-light mt-1'>Supports JPG, PNG, and other image formats</p>
 

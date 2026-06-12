@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import axios from 'axios'
 import { useAuth } from '@clerk/clerk-react'
 import toast from 'react-hot-toast'
+import FilePicker from '../components/FilePicker'
 
 axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
 
@@ -53,7 +54,7 @@ const RemoveObject = () => {
         </div>
 
         <p className='mt-6 text-sm font-medium'>Upload image</p>
-        <input onChange={(e)=>setInput(e.target.files[0])}  type="file" accept='image/*' className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300 text-gray-600 cursor-pointer file:cursor-pointer hover:border-gray-400 transition-colors' placeholder='The future of artificial intelligence' required/>
+        <FilePicker label='Upload image' accept='image/*' file={input} onChange={(e)=>setInput(e.target.files[0])} />
 
         <p className='mt-6 text-sm font-medium'>Describe object name to remove</p>
         <textarea onChange={(e)=>setObject(e.target.value)} value={object} rows={4} className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300' placeholder='e.g., watch or spoon, only single object name' required/>
