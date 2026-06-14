@@ -3,7 +3,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
-import { streamCreation } from '../utils/streamCreation'
+import { generateArticle } from '../api/ai'
 
 const WriteArticle = () => {
 
@@ -31,17 +31,17 @@ const WriteArticle = () => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault()
+    if (abortRef.current) return
     const controller = new AbortController()
     abortRef.current = controller
     setLoading(true)
     setContent('')
     try {
-      const prompt = `Write an article about ${input}. Target length: ${selectedLength.text}.`
-      await streamCreation({
-        path: '/api/ai/generate-article',
-        prompt,
+      await generateArticle({
+        topic: input,
         length: selectedLength.length,
-        token: await getToken(),
+        lengthLabel: selectedLength.text,
+        getToken,
         signal: controller.signal,
         onChunk: (text) => setContent((current) => current + text),
       })

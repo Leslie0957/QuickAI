@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { streamCreation } from '../src/utils/streamCreation.js'
+import { streamCreation } from '../src/api/stream.js'
 
 const encoder = new TextEncoder()
 const baseUrl = 'https://example.test'

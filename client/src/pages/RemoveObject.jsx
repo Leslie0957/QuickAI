@@ -1,48 +1,34 @@
 import { Scissors, Sparkles } from 'lucide-react'
 import React, { useState } from 'react'
-import axios from 'axios'
+import { removeObject } from '../api/ai'
+import { useUploadRequest } from '../hooks/useUploadRequest'
+import UploadFeedback from '../components/UploadFeedback'
 import { useAuth } from '@clerk/clerk-react'
 import toast from 'react-hot-toast'
 import FilePicker from '../components/FilePicker'
 
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
+
 
 const RemoveObject = () => {
 
   const [input, setInput] = useState('')
   const [object, setObject] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { loading, progress, errorMessage, run } = useUploadRequest()
   const [content, setContent] = useState('')
 
   const {getToken} = useAuth()
 
-  const onSubmitHandler = async (e)=> {
-    e.preventDefault();
-    try {
-      setLoading(true)
-
-      if(object.split(' ').length > 1){
-        return toast('Please enter only one object name')
-      }
-
-      const formData = new FormData()
-      formData.append('image', input)
-      formData.append('object', object)
-
-      const {data} = await axios.post('/api/ai/remove-image-object', formData, {headers:{Authorization: `Bearer ${await getToken()}`}} )
-
-      if(data.success){
-        setContent(data.content)
-      }else{
-        toast.error(data.message)
-      }
-    } catch (error) {
-      toast.error(error.message)
-    } finally {
-      setLoading(false)
-    }
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+    if (loading) return
+    if (!input) return toast.error('Please choose an image.')
+    if (object.trim().split(/\s+/).length > 1) return toast.error('Please enter only one object name')
+    await run(async (options) => {
+      const data = await removeObject({ file: input, object, getToken, ...options })
+      setContent(data.content)
+    })
   }
-  
+
   return (
     <div className='h-full overflow-y-auto p-6 flex items-start flex-wrap gap-4 text-slate-700'>
       {/* left col */}
@@ -54,15 +40,16 @@ const RemoveObject = () => {
         </div>
 
         <p className='mt-6 text-sm font-medium'>Upload image</p>
-        <FilePicker label='Upload image' accept='image/*' file={input} onChange={(e)=>setInput(e.target.files[0])} />
+        <FilePicker disabled={loading} label='Upload image' accept='image/*' file={input} onChange={(e)=>setInput(e.target.files[0])} />
 
         <p className='mt-6 text-sm font-medium'>Describe object name to remove</p>
-        <textarea onChange={(e)=>setObject(e.target.value)} value={object} rows={4} className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300' placeholder='e.g., watch or spoon, only single object name' required/>
+        <textarea disabled={loading} onChange={(e)=>setObject(e.target.value)} value={object} rows={4} className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300' placeholder='e.g., watch or spoon, only single object name' required/>
 
         <button disabled={loading} className='w-full flex justify-center items-center gap-2 bg-gradient-to-r from-[#417DF6] to-[#8E37EB] text-white px-4 py-2 mt-6 text-sm rounded-lg cursor-pointer'>
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> : <Scissors className='w-5'/>}
-          Remove object
+          {loading ? (progress.phase === 'processing' ? 'Processing...' : 'Uploading...') : errorMessage ? 'Retry' : 'Remove object'}
         </button>
+        <UploadFeedback loading={loading} progress={progress} errorMessage={errorMessage} />
       </form>
       {/* right col */}
       <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96'>

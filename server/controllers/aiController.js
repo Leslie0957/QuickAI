@@ -302,9 +302,5 @@ export const resumeReview = async (req, res) => {
         if (!res.headersSent) {
             res.status(400).json({ success: false, message: 'Could not read the PDF resume. Please upload a valid PDF.' })
         }
-    } finally {
-        if (resume?.path) {
-            await fs.promises.unlink(resume.path).catch(() => {})
-        }
     }
 }

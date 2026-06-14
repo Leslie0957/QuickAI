@@ -1,10 +1,10 @@
 import { Image, Sparkles } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
-import axios from 'axios'
+import { generateImage, getImageQuota } from '../api/ai'
 import { useAuth } from '@clerk/clerk-react'
 import toast from 'react-hot-toast'
 
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
+
 
 const GenerateImages = () => {
 
@@ -30,9 +30,7 @@ const GenerateImages = () => {
     setQuotaError('')
     const loadQuota = async () => {
       try {
-        const { data } = await axios.get('/api/ai/image-quota', {
-          headers: { Authorization: 'Bearer ' + await getTokenRef.current() },
-        })
+        const data = await getImageQuota({ getToken: () => getTokenRef.current() })
         if (active) {
           setRemaining(data.remaining)
           setQuotaError('')
@@ -53,18 +51,17 @@ const GenerateImages = () => {
     setLoading(true)
     setContent('')
     try {
-      const prompt = 'Generate an image of ' + input.trim() + ' in the style ' + selectedStyle
-      const { data } = await axios.post('/api/ai/generate-image', { prompt, publish }, {
-        headers: { Authorization: 'Bearer ' + await getTokenRef.current() },
+      const data = await generateImage({
+        description: input, style: selectedStyle, publish, getToken: () => getTokenRef.current(),
       })
       setContent(data.content)
       setRemaining(data.remaining)
       setQuotaError('')
     } catch (error) {
-      if (error.response?.status === 429 && error.response?.data?.remaining === 0) {
+      if (error.status === 429 && error.data?.remaining === 0) {
         setRemaining(0)
       }
-      toast.error(error.response?.data?.message || error.message)
+      toast.error(error.message)
     } finally {
       setLoading(false)
     }

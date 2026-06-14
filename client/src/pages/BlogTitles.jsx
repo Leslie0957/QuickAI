@@ -4,7 +4,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
-import { streamCreation } from '../utils/streamCreation'
+import { generateBlogTitles } from '../api/ai'
 
 const BlogTitles = () => {
 
@@ -28,16 +28,16 @@ const BlogTitles = () => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault()
+    if (abortRef.current) return
     const controller = new AbortController()
     abortRef.current = controller
     setLoading(true)
     setContent('')
     try {
-      const prompt = `Generate 5 concise blog titles for the keyword "${input}" in the ${selectedCategory} category. Return only a numbered list, without an introduction or bold formatting.`
-      await streamCreation({
-        path: '/api/ai/generate-blog-title',
-        prompt,
-        token: await getToken(),
+      await generateBlogTitles({
+        keyword: input,
+        category: selectedCategory,
+        getToken,
         signal: controller.signal,
         onChunk: (text) => setContent((current) => current + text),
       })

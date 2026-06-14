@@ -1,39 +1,30 @@
 import { Eraser, Sparkles } from 'lucide-react';
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import { removeBackground } from '../api/ai'
+import { useUploadRequest } from '../hooks/useUploadRequest'
+import UploadFeedback from '../components/UploadFeedback'
 import { useAuth } from '@clerk/clerk-react';
 import FilePicker from '../components/FilePicker'
 
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
+
 
 const RemoveBackground = () => {
 
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { loading, progress, errorMessage, run } = useUploadRequest()
   const [content, setContent] = useState('')
 
   const {getToken} = useAuth()
 
-  const onSubmitHandler = async (e)=> {
-    e.preventDefault();
-    try {
-      setLoading(true)
-
-      const formData = new FormData()
-      formData.append('image', input)
-
-      const {data} = await axios.post('/api/ai/remove-image-background', formData, {headers:{Authorization: `Bearer ${await getToken()}`}} )
-
-      if(data.success){
-        setContent(data.content)
-      }else{
-        toast.error(data.message)
-      }
-    } catch (error) {
-      toast.error(error.message)
-    }
-    setLoading(false)
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+    if (loading) return
+    if (!input) return toast.error('Please choose an image.')
+    await run(async (options) => {
+      const data = await removeBackground({ file: input, getToken, ...options })
+      setContent(data.content)
+    })
   }
 
   return (
@@ -45,14 +36,15 @@ const RemoveBackground = () => {
           <h1 className='text-xl font-semibold'>Background Removal</h1>
         </div>
         <p className='mt-6 text-sm font-medium'>Upload image</p>
-        <FilePicker label='Upload image' accept='image/*' file={input} onChange={(e)=>setInput(e.target.files[0])} />
+        <FilePicker disabled={loading} label='Upload image' accept='image/*' file={input} onChange={(e)=>setInput(e.target.files[0])} />
 
         <p className='text-xs text-gray-500 font-light mt-1'>Supports JPG, PNG, and other image formats</p>
 
         <button disabled={loading} className='w-full flex justify-center items-center gap-2 bg-gradient-to-r from-[#F6AB41] to-[#FF4938] text-white px-4 py-2 mt-6 text-sm rounded-lg cursor-pointer'>
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> : <Eraser className='w-5'/>}
-          Remove background
+          {loading ? (progress.phase === 'processing' ? 'Processing...' : 'Uploading...') : errorMessage ? 'Retry' : 'Remove background'}
         </button>
+        <UploadFeedback loading={loading} progress={progress} errorMessage={errorMessage} />
       </form>
       {/* right col */}
       <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96'>
