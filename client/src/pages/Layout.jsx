@@ -10,7 +10,7 @@ const Layout = () => {
   const [sidebar, setSidebar] = useState(false)
   const {user} = useUser()
   return user ? (
-    <div className='flex h-screen flex-col overflow-hidden'>
+    <div className='fixed inset-0 flex flex-col overflow-hidden'>
       <nav className='flex min-h-14 w-full shrink-0 items-center justify-between border-b border-gray-200 px-8'>
         <img className='cursor-pointer w-32 sm:w-44' src={assets.logo } alt="" onClick={()=>navigate('/')} />
         {
