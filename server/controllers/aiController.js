@@ -289,7 +289,7 @@ export const resumeReview = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No readable text found. Please upload a text-based PDF.' })
         }
         if (res.destroyed) return
-        const prompt = `Review the following resume and provide constructive feedback on its strengths, weaknesses, and areas for improvement. Resume Content:\n\n${pdfData.text}`
+        const prompt = `Review the following resume and give specific, constructive feedback in the same language as the resume. Format the response as Markdown with these sections: Overall assessment, Strengths, Areas to improve, and Actionable next steps. Use short paragraphs and a numbered list for actionable next steps. Give each step its own line and explain what to change and why in one or two sentences. Do not use tables, pipe characters as separators, emoji priority markers, or multiple suggestions on one line. Do not invent qualifications that are absent from the resume.\n\nResume Content:\n\n${pdfData.text}`
         await streamTextCreation(req, res, {
             prompt,
             storedPrompt: 'Review the uploaded resume',
