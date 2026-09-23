@@ -69,10 +69,14 @@ export const generateBlogTitle = async (req, res)=>{
             model: "deepseek-chat",
             messages: [{role: "user", content: prompt, } ],
             temperature: 0.7,
-            max_tokens: 100,
+            max_tokens: 400,
         });
 
-        const content = response.choices[0].message.content
+        const choice = response.choices[0]
+        if(choice.finish_reason === 'length'){
+            return res.json({ success: false, message: "Title generation was cut off. Please try again." })
+        }
+        const content = choice.message.content
 
         await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${content}, 'blog-title')`;
 
