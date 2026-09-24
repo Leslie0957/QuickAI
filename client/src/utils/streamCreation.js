@@ -3,6 +3,7 @@ export async function streamCreation({ path, prompt, length, token, signal, onCh
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(length === undefined ? { prompt } : { prompt, length }),

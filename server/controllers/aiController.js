@@ -28,6 +28,37 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage 
         return res.json({ success: false, message: "Limit reached. Upgrade to continue." })
     }
 
+    const saveCreation = async (content) => {
+        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${content}, ${type})`
+        if (plan !== 'premium') {
+            await clerkClient.users.updateUserMetadata(userId, {
+                privateMetadata: { free_usage: freeUsage + 1 }
+            })
+        }
+    }
+
+    // Existing deployments still expect JSON until their frontend is updated.
+    if (!req.get('Accept')?.includes('text/event-stream')) {
+        try {
+            const response = await AI.chat.completions.create({
+                model: 'deepseek-chat',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.7,
+                max_tokens: maxTokens,
+            })
+            const choice = response.choices[0]
+            if (choice.finish_reason === 'length' && type === 'blog-title') {
+                return res.json({ success: false, message: truncatedMessage })
+            }
+            const content = choice.message.content
+            await saveCreation(content)
+            return res.json({ success: true, content })
+        } catch (error) {
+            console.error(error)
+            return res.json({ success: false, message: error.message })
+        }
+    }
+
     const abortController = new AbortController()
     let disconnected = false
     res.on('close', () => {
@@ -72,14 +103,7 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage 
             throw new Error('Generation did not complete. Please try again.')
         }
 
-        await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${content}, ${type})`
-
-        if (plan !== 'premium') {
-            await clerkClient.users.updateUserMetadata(userId, {
-                privateMetadata: { free_usage: freeUsage + 1 }
-            })
-        }
-
+        await saveCreation(content)
         sendEvent(res, 'done', {})
     } catch (error) {
         if (!disconnected) {
