@@ -14,7 +14,7 @@ export const getUserCreations = async (req, res) => {
 
 export const getPublishedCreations = async (req, res) => {
     try {
-        const creations = await sql`SELECT * FROM creations WHERE publish = true ORDER BY created_at DESC`;
+        const creations = await sql`SELECT * FROM creations WHERE publish = true AND type = 'image' ORDER BY created_at DESC`;
         res.json({success: true, creations})
 
     } catch (error) {
@@ -55,5 +55,30 @@ export const toggleLikeCreation = async (req, res) => {
 
     } catch (error) {
         res.json({success: false, message: error.message})
+    }
+}
+
+export const setCreationPublish = async (req, res) => {
+    try {
+        const { userId } = req.auth()
+        const { id, publish } = req.body
+
+        const creationId = Number(id)
+        if (!Number.isSafeInteger(creationId) || creationId <= 0 || typeof publish !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'Invalid publish request.' })
+        }
+
+        const [creation] = await sql`UPDATE creations
+            SET publish = ${publish}
+            WHERE id = ${creationId} AND user_id = ${userId} AND type = 'image'
+            RETURNING id, publish`
+
+        if (!creation) {
+            return res.status(404).json({ success: false, message: 'Image not found.' })
+        }
+
+        res.json({ success: true, creation })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
     }
 }

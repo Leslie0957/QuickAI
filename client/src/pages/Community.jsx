@@ -11,23 +11,27 @@ const Community = () => {
   const [creations, setCreations] = useState([])
   const {user} = useUser()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   const {getToken} = useAuth()
 
-  const fetchCreations = async ()=>{
+  const fetchCreations = async () => {
+    setLoading(true)
+    setLoadError('')
     try {
-      const {data} = await axios.get('/api/user/get-published-creations', {
-        headers: {Authorization: `Bearer ${await getToken()}`}
+      const { data } = await axios.get('/api/user/get-published-creations', {
+        headers: { Authorization: `Bearer ${await getToken()}` }
       })
-      if(data.success){
+      if (data.success) {
         setCreations(data.creations)
-      }else{
-        toast.error(data.message)
+      } else {
+        setLoadError(data.message || 'Could not load public images.')
       }
     } catch (error) {
-      toast.error(error.message)
+      setLoadError(error.response?.data?.message || error.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const imageLikeToggle = async (id)=>{
@@ -51,18 +55,26 @@ const Community = () => {
     if(user){
       fetchCreations()
     }
-  },[user])
+  },[user?.id])
 
   return !loading ? (
     <div className='flex-1 h-full flex flex-col gap-4 p-6'>
       Creations
       <div className='bg-white h-full w-full rounded-xl overflow-y-scroll'>
-        {creations.length === 0 && (
-          <div className='flex h-full items-center justify-center px-4 text-center text-sm text-gray-500'>
-            No public images yet. Images shared with “Make this image Public” will appear here.
+        {loadError && (
+          <div className='flex h-full flex-col items-center justify-center gap-3 px-4 text-center text-sm text-gray-500'>
+            <p>Could not load public images: {loadError}</p>
+            <button type='button' onClick={fetchCreations} className='rounded-md border border-gray-300 px-4 py-2 text-slate-700'>
+              Retry
+            </button>
           </div>
         )}
-        {creations.map((creation)=> (
+        {!loadError && creations.length === 0 && (
+          <div className='flex h-full items-center justify-center px-4 text-center text-sm text-gray-500'>
+            No public images yet. Share an image from Dashboard or choose “Make this image Public” when generating one.
+          </div>
+        )}
+        {!loadError && creations.map((creation)=> (
           <div key={creation.id} className='relative group inline-block pl-3 pt-3 w-full sm:max-w-1/2 lg:max-w-1/3'>
             <img src={creation.content} alt="" className='w-full h-full object-cover rounded-lg'/>
             
