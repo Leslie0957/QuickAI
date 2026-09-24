@@ -1,11 +1,9 @@
 import { Edit, Sparkles } from 'lucide-react'
-import React, { useState } from 'react'
-import axios from 'axios'
+import React, { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
-
-axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
+import { streamCreation } from '../utils/streamCreation'
 
 const WriteArticle = () => {
 
@@ -19,31 +17,38 @@ const WriteArticle = () => {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
+  const abortRef = useRef(null)
+
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const {getToken} = useAuth()
 
-  // 一点击就会执行
-  const onSubmitHandler = async (e)=> {
-    e.preventDefault();
-    try {  
-      setLoading(true)
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoading(true)
+    setContent('')
+    try {
       const prompt = `Write an article about ${input}. Target length: ${selectedLength.text}.`
-
-      const {data} = await axios.post('/api/ai/generate-article', {prompt, length:selectedLength.length}, {
-        headers: {Authorization: `Bearer ${await getToken()}`}
+      await streamCreation({
+        path: '/api/ai/generate-article',
+        prompt,
+        length: selectedLength.length,
+        token: await getToken(),
+        signal: controller.signal,
+        onChunk: (text) => setContent((current) => current + text),
       })
-
-      if(data.success){
-        setContent(data.content)
-      }else{
-        toast.error(data.message)
-      }
     } catch (error) {
-      toast.error(error.message)
+      if (error.name !== 'AbortError') {
+        setContent('')
+        toast.error(error.message)
+      }
+    } finally {
+      abortRef.current = null
+      setLoading(false)
     }
-    setLoading(false)
   }
-
 
   return (
     <div className='h-full overflow-y-scroll p-6 flex items-start flex-wrap gap-4 text-slate-700'>
@@ -90,9 +95,9 @@ const WriteArticle = () => {
           </div>
           ) : (
             <div className='mt-3 h-full overflow-y-scroll text-sm text-slate-600'>
-              <div className='reset-tw'>
-                <Markdown>{content}</Markdown>
-              </div>
+              {loading ? <div className='whitespace-pre-wrap'>{content}</div> : (
+                <div className='reset-tw'><Markdown>{content}</Markdown></div>
+              )}
             </div>
           )}
           
