@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-react'
 import { Hash, Sparkles } from 'lucide-react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
@@ -15,8 +15,14 @@ const BlogTitles = () => {
   const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
   const abortRef = useRef(null)
+  const outputRef = useRef(null)
 
   useEffect(() => () => abortRef.current?.abort(), [])
+  useLayoutEffect(() => {
+    if (loading && outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight
+    }
+  }, [content, loading])
 
   const { getToken } = useAuth()
 
@@ -72,7 +78,7 @@ const BlogTitles = () => {
         </button>
       </form>
       {/* right col */}
-      <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96'>
+      <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96 max-h-[600px]'>
         <div className='flex items-center gap-3'>
           <Hash className='w-5 h-5 text-[#8E37EB]' />
           <h1 className='text-xl font-semibold'>Generated titles</h1>
@@ -86,10 +92,8 @@ const BlogTitles = () => {
               </div>
             </div>
           ) : (
-            <div className='mt-3 h-full overflow-y-scroll text-sm text-slate-600'>
-              {loading ? <div className='whitespace-pre-wrap'>{content}</div> : (
-                <div className='reset-tw'><Markdown>{content}</Markdown></div>
-              )}
+            <div ref={outputRef} className='mt-3 flex-1 min-h-0 overflow-y-auto text-sm text-slate-600'>
+              <div className='reset-tw'><Markdown>{content}</Markdown></div>
             </div>
           )
         }
