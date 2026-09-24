@@ -23,7 +23,11 @@ app.use(requireAuth())
 app.use('/api/ai', aiRouter)
 app.use('/api/user', userRouter)
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>{
-    console.log('Server is running on port', PORT)
-})
+if (!process.env.VERCEL) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log('Server is running on port', PORT)
+    })
+}
+
+export default app
