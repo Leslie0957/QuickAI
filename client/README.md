@@ -1,12 +1,30 @@
-# React + Vite
+# QuickAI 前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+基于 React、Vite 和 Tailwind CSS 的 AI 创作界面。
 
-Currently, two official plugins are available:
+- [项目介绍与在线体验](../README.md)
+- [工程实践记录](../INTERVIEW_NOTES.md)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 开发
 
-## Expanding the ESLint configuration
+按照根目录 README 配置 `client/.env`，然后运行：
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```sh
+npm ci
+npm run dev
+```
+
+## 构建与测试
+
+```sh
+npm run build
+node --test tests/*.test.mjs
+```
+
+## 请求层
+
+- `src/api/http.js`：独立 Axios 实例、鉴权与错误转换。
+- `src/api/stream.js`：SSE 解析、完成检查、取消及支持上传进度的流式请求。
+- `src/api/ai.js`：六项 AI 功能与图片额度的业务方法。
+
+页面负责输入和展示；三个上传页面通过 `useUploadRequest` 管理进度、手动重试与取消。

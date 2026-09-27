@@ -8,26 +8,26 @@ const Footer = () => {
         <div className="md:max-w-96">
             <img className="h-9" src={assets.logo} alt="Logo" />
             <p className="mt-6 text-sm">
-                Experience the power of AI with QuickAi.<br />Transform your content creation with our suite of premium AI tools. Write articles, generate images, and enhance your workflow.
+                QuickAI brings writing, image creation, and resume feedback into one workspace.<br />Create, revisit your work, and share images with the community.
             </p>
         </div>
         <div className="flex-1 flex items-start md:justify-end gap-20">
             <div>
                 <h2 className="font-semibold mb-5 text-gray-800">Company</h2>
                 <ul className="text-sm space-y-2">
-                    <li><a href="#">Home</a></li>
-                    <li><a href="#">About us</a></li>
-                    <li><a href="#">Contact us</a></li>
-                    <li><a href="#">Privacy policy</a></li>
+                    <li><a href="/">Home</a></li>
+                    <li><span>About us · Coming soon</span></li>
+                    <li><a href="https://github.com/Leslie0957/QuickAI">GitHub project</a></li>
+                    <li><span>Privacy policy · Coming soon</span></li>
                 </ul>
             </div>
             <div>
                 <h2 className="font-semibold text-gray-800 mb-5">Subscribe to our newsletter</h2>
                 <div className="text-sm space-y-2">
-                    <p>The latest news, articles, and resources, sent to your inbox weekly.</p>
+                    <p>Demo form only. Email subscriptions are not connected yet.</p>
                     <div className="flex items-center gap-2 pt-4">
-                        <input className="border border-gray-500/30 placeholder-gray-500 focus:ring-2 ring-indigo-600 outline-none w-full max-w-64 h-9 rounded px-2" type="email" placeholder="Enter your email" />
-                        <button className="bg-primary w-24 h-9 text-white rounded cursor-pointer">Subscribe</button>
+                        <input disabled aria-label="Email subscription is not available yet" className="border border-gray-500/30 placeholder-gray-500 focus:ring-2 ring-indigo-600 outline-none w-full max-w-64 h-9 rounded px-2" type="email" placeholder="Enter your email" />
+                        <button disabled className="bg-primary px-4 h-9 text-white rounded opacity-60 cursor-not-allowed whitespace-nowrap">Coming soon</button>
                     </div>
                 </div>
             </div>
