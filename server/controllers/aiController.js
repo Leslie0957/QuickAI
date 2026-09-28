@@ -117,7 +117,9 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage,
 }
 
 export const generateArticle = (req, res) => streamTextCreation(req, res, {
-    maxTokens: Math.min(Math.max(Number(req.body.length) || 800, 800) * 2, 3200),
+    maxTokens: Number(req.body.length) >= 1600
+        ? 10000
+        : Math.min(Math.max(Number(req.body.length) || 800, 800) * 2, 3200),
     type: 'article',
     truncatedMessage: 'Article generation was cut off. Please try again.'
 })

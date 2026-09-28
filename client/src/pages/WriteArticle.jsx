@@ -17,6 +17,7 @@ const WriteArticle = () => {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
+  const [generationError, setGenerationError] = useState('')
   const abortRef = useRef(null)
   const outputRef = useRef(null)
 
@@ -36,6 +37,7 @@ const WriteArticle = () => {
     abortRef.current = controller
     setLoading(true)
     setContent('')
+    setGenerationError('')
     try {
       await generateArticle({
         topic: input,
@@ -47,7 +49,7 @@ const WriteArticle = () => {
       })
     } catch (error) {
       if (error.name !== 'AbortError') {
-        setContent('')
+        setGenerationError(error.message)
         toast.error(error.message)
       }
     } finally {
@@ -91,6 +93,8 @@ const WriteArticle = () => {
             <Edit className='w-5 h-5 text-[#4A7AFF]'/>
             <h1 className='text-xl font-semibold'>Generated article</h1>
           </div>
+
+          {generationError && <p role='alert' className='mt-3 text-sm text-red-600'>{generationError}</p>}
 
           {!content ? (
             <div className='flex-1 flex justify-center items-center'>
