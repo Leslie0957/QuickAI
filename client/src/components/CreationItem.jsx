@@ -16,8 +16,16 @@ const CreationItem = ({ item, onPublishChange }) => {
   }
 
   return (
-    <div onClick={() => setExpanded(!expanded)} className='p-4 max-w-5xl text-sm bg-white border border-gray-200 rounded-lg cursor-pointer'>
-      <div className='flex justify-between items-center gap-4'>
+    <div className='p-4 max-w-5xl text-sm bg-white border border-gray-200 rounded-lg'>
+      <div onClick={() => setExpanded((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault()
+            setExpanded((current) => !current)
+          }
+        }}
+        role='button' tabIndex={0} aria-expanded={expanded}
+        className='flex justify-between items-center gap-4 cursor-pointer'>
         <div>
           <h2>{item.prompt}</h2>
           <p className='text-gray-500'>{item.type} - {new Date(item.created_at).toLocaleDateString()}</p>
@@ -34,13 +42,14 @@ const CreationItem = ({ item, onPublishChange }) => {
       </div>
       {
         expanded && (
-          <div>
+          <div tabIndex={0}
+            className='mt-3 max-h-96 overflow-y-auto text-sm text-slate-700'>
             {item.type === 'image' ? (
               <div>
-                <img src={item.content} alt="image" className='mt-3 w-full max-w-md' />
+                <img src={item.content} alt="image" className='w-full max-w-md' />
               </div>
             ) : (
-              <div className='mt-3 text-sm text-slate-700'>
+              <div>
                 <div className='reset-tw'>
                   <Markdown>{item.content}</Markdown>
                 </div>
