@@ -17,6 +17,9 @@ const GenerateImages = () => {
   const [content, setContent] = useState('')
   const [remaining, setRemaining] = useState(null)
   const [quotaError, setQuotaError] = useState('')
+  const generationRef = useRef(null)
+
+  useEffect(() => () => generationRef.current?.abort(), [])
 
   const { getToken, userId } = useAuth()
   const getTokenRef = useRef(getToken)
@@ -48,11 +51,14 @@ const GenerateImages = () => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault()
+    if (generationRef.current) return
+    const controller = new AbortController()
+    generationRef.current = controller
     setLoading(true)
     setContent('')
     try {
       const data = await generateImage({
-        description: input, style: selectedStyle, publish, getToken: () => getTokenRef.current(),
+        description: input, style: selectedStyle, publish, getToken: () => getTokenRef.current(), signal: controller.signal,
       })
       setContent(data.content)
       setRemaining(data.remaining)
@@ -61,8 +67,9 @@ const GenerateImages = () => {
       if (error.status === 429 && error.data?.remaining === 0) {
         setRemaining(0)
       }
-      toast.error(error.message)
+      if (error.name !== 'AbortError') toast.error(error.message)
     } finally {
+      generationRef.current = null
       setLoading(false)
     }
   }

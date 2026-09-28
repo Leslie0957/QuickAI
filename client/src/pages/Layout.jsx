@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { assets } from '../assets/assets'
 import { Menu, X } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
+import ToolPageCache from '../components/ToolPageCache'
 import {SignIn, useUser } from '@clerk/clerk-react'
 
 const Layout = () => {
@@ -10,7 +11,7 @@ const Layout = () => {
   const [sidebar, setSidebar] = useState(false)
   const {user} = useUser()
   return user ? (
-    <div className='fixed inset-0 flex flex-col overflow-hidden'>
+    <div key={user.id} className='fixed inset-0 flex flex-col overflow-hidden'>
       <nav className='flex min-h-14 w-full shrink-0 items-center justify-between border-b border-gray-200 px-8'>
         <img className='cursor-pointer w-32 sm:w-44' src={assets.logo } alt="" onClick={()=>navigate('/')} />
         {
@@ -21,6 +22,7 @@ const Layout = () => {
       <div className='flex min-h-0 w-full flex-1'>
         <Sidebar sidebar={sidebar} setSidebar={setSidebar}/>
         <div className='min-h-0 min-w-0 flex-1 overflow-hidden bg-[#F4F7F8]'>
+          <ToolPageCache />
           <Outlet />
         </div>
       </div>

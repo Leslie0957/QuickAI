@@ -3,12 +3,6 @@ import { Route, Routes } from 'react-router-dom'
 import Home from './pages/Home'
 import Layout from './pages/Layout'
 import Dashboard from './pages/Dashboard'
-import WriteArticle from './pages/WriteArticle'
-import BlogTitles from './pages/BlogTitles'
-import GenerateImages from './pages/GenerateImages'
-import RemoveBackground from './pages/RemoveBackground'
-import RemoveObject from './pages/RemoveObject'
-import ReviewResume from './pages/ReviewResume'
 import Community from './pages/Community'
 import {Toaster} from 'react-hot-toast'
 
@@ -23,12 +17,12 @@ const App = () => {
         <Route path='/ai' element={<Layout />}>
         {/* 为什么是index:打开/ai 默认显示*/}
           <Route index element={<Dashboard />} />  
-          <Route path='write-article' element={<WriteArticle />} />
-          <Route path='blog-titles' element={<BlogTitles />}/>
-          <Route path='generate-images' element={<GenerateImages />} />
-          <Route path='remove-background' element={<RemoveBackground />} />
-          <Route path='remove-object' element={<RemoveObject />} />
-          <Route path='review-resume' element={<ReviewResume />} />
+          <Route path='write-article' element={null} />
+          <Route path='blog-titles' element={null}/>
+          <Route path='generate-images' element={null} />
+          <Route path='remove-background' element={null} />
+          <Route path='remove-object' element={null} />
+          <Route path='review-resume' element={null} />
           <Route path='community' element={<Community />} />
         </Route>
       </Routes>
