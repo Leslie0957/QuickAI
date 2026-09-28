@@ -40,7 +40,7 @@ const CreationItem = ({ item, onPublishChange }) => {
                 <img src={item.content} alt="image" className='mt-3 w-full max-w-md' />
               </div>
             ) : (
-              <div className='mt-3 h-full overflow-y-scroll text-sm text-slate-700'>
+              <div className='mt-3 text-sm text-slate-700'>
                 <div className='reset-tw'>
                   <Markdown>{item.content}</Markdown>
                 </div>
