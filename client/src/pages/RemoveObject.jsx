@@ -6,6 +6,7 @@ import UploadFeedback from '../components/UploadFeedback'
 import { useAuth } from '@clerk/clerk-react'
 import toast from 'react-hot-toast'
 import FilePicker from '../components/FilePicker'
+import StopRequestButton from '../components/StopRequestButton'
 
 
 
@@ -13,7 +14,9 @@ const RemoveObject = () => {
 
   const [input, setInput] = useState('')
   const [object, setObject] = useState('')
-  const { loading, progress, errorMessage, run } = useUploadRequest()
+  const { loading, stopping, progress, errorMessage, run, cancel } = useUploadRequest({
+    stoppedMessage: 'Stopped waiting. Image processing may already have started.',
+  })
   const [content, setContent] = useState('')
 
   const {getToken} = useAuth()
@@ -49,6 +52,7 @@ const RemoveObject = () => {
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> : <Scissors className='w-5'/>}
           {loading ? (progress.phase === 'processing' ? 'Processing...' : 'Uploading...') : errorMessage ? 'Retry' : 'Remove object'}
         </button>
+        {loading && <StopRequestButton onClick={cancel} stopping={stopping} label='Stop processing' />}
         <UploadFeedback loading={loading} progress={progress} errorMessage={errorMessage} />
       </form>
       {/* right col */}

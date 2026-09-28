@@ -6,13 +6,16 @@ import { useUploadRequest } from '../hooks/useUploadRequest'
 import UploadFeedback from '../components/UploadFeedback'
 import { useAuth } from '@clerk/clerk-react';
 import FilePicker from '../components/FilePicker'
+import StopRequestButton from '../components/StopRequestButton'
 
 
 
 const RemoveBackground = () => {
 
   const [input, setInput] = useState('')
-  const { loading, progress, errorMessage, run } = useUploadRequest()
+  const { loading, stopping, progress, errorMessage, run, cancel } = useUploadRequest({
+    stoppedMessage: 'Stopped waiting. Image processing may already have started.',
+  })
   const [content, setContent] = useState('')
 
   const {getToken} = useAuth()
@@ -44,6 +47,7 @@ const RemoveBackground = () => {
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> : <Eraser className='w-5'/>}
           {loading ? (progress.phase === 'processing' ? 'Processing...' : 'Uploading...') : errorMessage ? 'Retry' : 'Remove background'}
         </button>
+        {loading && <StopRequestButton onClick={cancel} stopping={stopping} label='Stop processing' />}
         <UploadFeedback loading={loading} progress={progress} errorMessage={errorMessage} />
       </form>
       {/* right col */}

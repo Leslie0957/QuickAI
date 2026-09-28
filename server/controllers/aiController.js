@@ -28,6 +28,7 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage,
     if (plan !== 'premium' && freeUsage >= 10) {
         return res.json({ success: false, message: "Limit reached. Upgrade to continue." })
     }
+    if (res.destroyed) return
 
     const saveCreation = async (content) => {
         await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${storedPrompt}, ${content}, ${type})`
@@ -154,16 +155,30 @@ export const generateImage = async (req, res) => {
     }
 
     const day = currentQuotaDay()
+    const abortController = new AbortController()
+    const onDisconnect = () => {
+        if (!res.writableEnded) abortController.abort()
+    }
+    const ensureConnected = () => {
+        if (abortController.signal.aborted) {
+            const error = new Error('Request cancelled.')
+            error.name = 'AbortError'
+            throw error
+        }
+    }
+    res.once('close', onDisconnect)
+    if (res.destroyed) abortController.abort()
     let reserved = false
     let saved = false
+    let uploadedPublicId
     let stage = 'quota'
     try {
         const remaining = await reserveImage(userId, day)
+        reserved = remaining !== null
+        ensureConnected()
         if (remaining === null) {
             return res.status(429).json({ success: false, remaining: 0, message: 'Daily limit reached. You can generate 10 images per day.' })
         }
-        reserved = true
-
         stage = 'provider'
         const { data } = await axios.post(
             `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
@@ -171,14 +186,18 @@ export const generateImage = async (req, res) => {
             {
                 headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}` },
                 timeout: 90000,
+                signal: abortController.signal,
             }
         )
+        ensureConnected()
         if (!data?.success || !data.result?.image) {
             throw new Error('Image provider returned no image.')
         }
 
         stage = 'storage'
-        const { secure_url } = await cloudinary.uploader.upload(`data:image/jpeg;base64,${data.result.image}`)
+        const { secure_url, public_id } = await cloudinary.uploader.upload(`data:image/jpeg;base64,${data.result.image}`)
+        uploadedPublicId = public_id
+        ensureConnected()
         stage = 'database'
         await sql`
             INSERT INTO creations (user_id, prompt, content, type, publish)
@@ -186,8 +205,12 @@ export const generateImage = async (req, res) => {
         `
         saved = true
         if (publish) await syncPublicProfile(userId)
-        res.json({ success: true, content: secure_url, remaining })
+        if (!res.destroyed) res.json({ success: true, content: secure_url, remaining })
     } catch (error) {
+        if (uploadedPublicId && !saved) {
+            try { await cloudinary.uploader.destroy(uploadedPublicId) }
+            catch (cleanupError) { console.error('Image cleanup failed:', cleanupError.message) }
+        }
         if (reserved && !saved) {
             try {
                 await releaseImage(userId, day)
@@ -195,6 +218,7 @@ export const generateImage = async (req, res) => {
                 console.error('Image quota release failed:', releaseError.message)
             }
         }
+        if (abortController.signal.aborted || res.destroyed) return
         console.error(`Image generation failed at ${stage}:`, error.response?.status, error.message)
         if (stage === 'quota') {
             return res.status(500).json({ success: false, message: 'Could not check your image quota. Please try again.' })
@@ -209,6 +233,8 @@ export const generateImage = async (req, res) => {
             return res.status(502).json({ success: false, message })
         }
         res.status(500).json({ success: false, message: 'Could not save the generated image. Please try again.' })
+    } finally {
+        res.removeListener('close', onDisconnect)
     }
 }
 
@@ -222,8 +248,9 @@ export const removeImageBackground = async (req, res)=>{
         if(plan !== 'premium'){
             return res.json({ success: false, message: "This feature is only avaliable for premium subscriptions."})
         }
+        if (res.destroyed) return
 
-        const {secure_url} = await cloudinary.uploader.upload(image.path, {
+        const {secure_url, public_id} = await cloudinary.uploader.upload(image.path, {
             transformation: [
                 {
                     effect: 'background_removal',
@@ -231,6 +258,10 @@ export const removeImageBackground = async (req, res)=>{
                 }
             ]
         })
+        if (res.destroyed) {
+            await cloudinary.uploader.destroy(public_id)
+            return
+        }
 
         await sql`INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'Remove background from image', ${secure_url}, 'image')`;
 
@@ -252,8 +283,13 @@ export const removeImageObject = async (req, res)=>{
         if(plan !== 'premium'){
             return res.json({ success: false, message: "This feature is only avaliable for premium subscriptions."})
         }
+        if (res.destroyed) return
 
         const {public_id} = await cloudinary.uploader.upload(image.path)
+        if (res.destroyed) {
+            await cloudinary.uploader.destroy(public_id)
+            return
+        }
 
         const imageUrl = cloudinary.url(public_id, {
             transformation: [{effect: `gen_remove:${object}`}],

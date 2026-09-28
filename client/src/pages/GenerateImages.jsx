@@ -2,7 +2,8 @@ import { Image, Sparkles } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 import { generateImage, getImageQuota } from '../api/ai'
 import { useAuth } from '@clerk/clerk-react'
-import toast from 'react-hot-toast'
+import { useCancelableRequest } from '../hooks/useCancelableRequest'
+import StopRequestButton from '../components/StopRequestButton'
 
 
 
@@ -13,13 +14,12 @@ const GenerateImages = () => {
   const [selectedStyle, setSelectedStyle] = useState('Realistic')
   const [input, setInput] = useState('')
   const [publish, setPublish] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
   const [remaining, setRemaining] = useState(null)
   const [quotaError, setQuotaError] = useState('')
-  const generationRef = useRef(null)
-
-  useEffect(() => () => generationRef.current?.abort(), [])
+  const { loading, stopping, errorMessage, run, stop } = useCancelableRequest({
+    stoppedMessage: 'Stopped waiting for the image. If generation had already finished, it may count toward your daily limit.',
+  })
 
   const { getToken, userId } = useAuth()
   const getTokenRef = useRef(getToken)
@@ -51,26 +51,20 @@ const GenerateImages = () => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault()
-    if (generationRef.current) return
-    const controller = new AbortController()
-    generationRef.current = controller
-    setLoading(true)
-    setContent('')
-    try {
-      const data = await generateImage({
-        description: input, style: selectedStyle, publish, getToken: () => getTokenRef.current(), signal: controller.signal,
+    const result = await run(async ({ signal }) => {
+      setContent('')
+      return generateImage({
+        description: input, style: selectedStyle, publish, getToken: () => getTokenRef.current(), signal,
       })
-      setContent(data.content)
-      setRemaining(data.remaining)
+    })
+    if (result.status === 'complete') {
+      setContent(result.value.content)
+      setRemaining(result.value.remaining)
       setQuotaError('')
-    } catch (error) {
-      if (error.status === 429 && error.data?.remaining === 0) {
+    } else if (result.status === 'error') {
+      if (result.error.status === 429 && result.error.data?.remaining === 0) {
         setRemaining(0)
       }
-      if (error.name !== 'AbortError') toast.error(error.message)
-    } finally {
-      generationRef.current = null
-      setLoading(false)
     }
   }
   return (
@@ -112,6 +106,8 @@ const GenerateImages = () => {
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> : <Image className='w-5' />}
           {remaining === 0 ? 'Daily limit reached' : 'Generate image'}
         </button>
+        {loading && <StopRequestButton onClick={stop} stopping={stopping} />}
+        {errorMessage && <p role='alert' className='mt-3 text-sm text-red-600'>{errorMessage}</p>}
       </form>
       {/* right col */}
       <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96'>

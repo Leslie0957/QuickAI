@@ -1,10 +1,11 @@
 import { useAuth } from '@clerk/clerk-react'
 import { Hash, Sparkles } from 'lucide-react'
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 
-import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
 import { generateBlogTitles } from '../api/ai'
+import { useCancelableRequest } from '../hooks/useCancelableRequest'
+import StopRequestButton from '../components/StopRequestButton'
 
 const BlogTitles = () => {
 
@@ -12,12 +13,10 @@ const BlogTitles = () => {
 
   const [selectedCategory, setSelectedCategory] = useState('General')
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
-  const abortRef = useRef(null)
+  const { loading, stopping, errorMessage, run, stop } = useCancelableRequest()
   const outputRef = useRef(null)
 
-  useEffect(() => () => abortRef.current?.abort(), [])
   useLayoutEffect(() => {
     if (loading && outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight
@@ -28,28 +27,16 @@ const BlogTitles = () => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault()
-    if (abortRef.current) return
-    const controller = new AbortController()
-    abortRef.current = controller
-    setLoading(true)
-    setContent('')
-    try {
+    await run(async ({ signal }) => {
+      setContent('')
       await generateBlogTitles({
         keyword: input,
         category: selectedCategory,
         getToken,
-        signal: controller.signal,
-        onChunk: (text) => setContent((current) => current + text),
+        signal,
+        onChunk: (text) => { if (!signal.aborted) setContent((current) => current + text) },
       })
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        setContent('')
-        toast.error(error.message)
-      }
-    } finally {
-      abortRef.current = null
-      setLoading(false)
-    }
+    })
   }
 
   return (
@@ -76,6 +63,7 @@ const BlogTitles = () => {
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> : <Hash className='w-5' />}
           Generate title
         </button>
+        {loading && <StopRequestButton onClick={stop} stopping={stopping} />}
       </form>
       {/* right col */}
       <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96 max-h-[600px]'>
@@ -83,6 +71,7 @@ const BlogTitles = () => {
           <Hash className='w-5 h-5 text-[#8E37EB]' />
           <h1 className='text-xl font-semibold'>Generated titles</h1>
         </div>
+        {errorMessage && <p role='alert' className='mt-3 text-sm text-red-600'>{errorMessage}</p>}
         {
           !content ? (
             <div className='flex-1 flex justify-center items-center'>

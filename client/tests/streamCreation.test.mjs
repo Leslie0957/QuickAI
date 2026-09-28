@@ -63,6 +63,32 @@ test('reports server error after partial output', async () => {
   }
 })
 
+test('abort after a streamed chunk stops delivery without treating it as completion', async () => {
+  const originalFetch = globalThis.fetch
+  const controller = new AbortController()
+  let source
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    start(streamController) {
+      source = streamController
+      controller.signal.addEventListener('abort', () => streamController.error(new DOMException('Request cancelled.', 'AbortError')))
+      streamController.enqueue(encoder.encode('event: chunk\ndata: {"text":"partial"}\n\n'))
+    },
+  }), { headers: { 'Content-Type': 'text/event-stream' } })
+  try {
+    const chunks = []
+    await assert.rejects(
+      streamCreation({ baseUrl, path: '/x', prompt: 'x', token: 't', signal: controller.signal,
+        onChunk: (text) => { chunks.push(text); controller.abort() } }),
+      { name: 'AbortError' },
+    )
+    assert.deepEqual(chunks, ['partial'])
+    assert.equal(controller.signal.aborted, true)
+  } finally {
+    if (!controller.signal.aborted) source.close()
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('rejects a stream that closes without done', async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = async () => responseFromParts(['event: chunk\ndata: {"text":"partial"}\n\n'])

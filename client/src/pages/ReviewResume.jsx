@@ -7,13 +7,14 @@ import UploadFeedback from '../components/UploadFeedback'
 import { useAuth } from '@clerk/clerk-react';
 import Markdown from 'react-markdown';
 import FilePicker from '../components/FilePicker'
+import StopRequestButton from '../components/StopRequestButton'
 
 
 
 const ReviewResume = () => {
 
   const [input, setInput] = useState('')
-  const { loading, progress, errorMessage, run, cancel } = useUploadRequest()
+  const { loading, stopping, progress, errorMessage, run, cancel } = useUploadRequest()
   const [content, setContent] = useState('')
 
   const {getToken} = useAuth()
@@ -37,7 +38,7 @@ const ReviewResume = () => {
       setContent('')
       await reviewResume({
         file: input, getToken, ...options,
-        onChunk: (text) => setContent((current) => current + text),
+        onChunk: (text) => { if (!options.signal.aborted) setContent((current) => current + text) },
       })
     })
   }
@@ -59,11 +60,7 @@ const ReviewResume = () => {
           {loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span>:<FileText className='w-5'/>}
           {loading ? (progress.phase === 'processing' ? 'Analyzing...' : 'Uploading...') : errorMessage ? 'Retry' : 'Review Resume'}
         </button>
-        {loading && (
-          <button type='button' onClick={cancel} className='mt-3 w-full rounded-lg border border-gray-300 py-2 text-sm'>
-            Stop generating
-          </button>
-        )}
+        {loading && <StopRequestButton onClick={cancel} stopping={stopping} />}
         <UploadFeedback loading={loading} progress={progress} errorMessage={errorMessage} />
       </form>
       {/* right col */}

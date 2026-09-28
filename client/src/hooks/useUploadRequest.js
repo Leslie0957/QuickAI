@@ -1,40 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
-import toast from 'react-hot-toast'
+import { useCancelableRequest } from './useCancelableRequest'
 
-export function useUploadRequest() {
-  const [loading, setLoading] = useState(false)
+export function useUploadRequest(options) {
   const [progress, setProgress] = useState({ phase: 'idle', percent: null })
-  const [errorMessage, setErrorMessage] = useState('')
-  const abortRef = useRef(null)
+  const request = useCancelableRequest(options)
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
-    return () => { mounted.current = false; abortRef.current?.abort() }
+    return () => { mounted.current = false }
   }, [])
   const run = async (operation) => {
-    if (abortRef.current) return
-    const controller = new AbortController()
-    abortRef.current = controller
-    setLoading(true)
-    setErrorMessage('')
-    setProgress({ phase: 'preparing', percent: null })
-    try {
-      await operation({
-        signal: controller.signal,
-        onUploadProgress: (value) => { if (mounted.current) setProgress(value) },
+    const result = await request.run(async ({ signal }) => {
+      if (mounted.current) setProgress({ phase: 'preparing', percent: null })
+      return operation({
+        signal,
+        onUploadProgress: (value) => { if (mounted.current && !signal.aborted) setProgress(value) },
       })
-      if (mounted.current) setProgress({ phase: 'done', percent: 100 })
-    } catch (error) {
-      if (mounted.current) {
-        const message = error.name === 'AbortError' ? 'Request stopped. Partial results may be incomplete.' : error.message
-        setErrorMessage(message)
-        setProgress({ phase: 'error', percent: null })
-        if (error.name !== 'AbortError') toast.error(message)
-      }
-    } finally {
-      abortRef.current = null
-      if (mounted.current) setLoading(false)
+    })
+    if (mounted.current) {
+      if (result.status === 'complete') setProgress({ phase: 'done', percent: 100 })
+      if (result.status === 'error' || result.status === 'stopped') setProgress({ phase: 'error', percent: null })
     }
+    return result
   }
-  return { loading, progress, errorMessage, run, cancel: () => abortRef.current?.abort() }
+  return { ...request, progress, run, cancel: request.stop }
 }

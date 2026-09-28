@@ -1,9 +1,10 @@
 import { Edit, Sparkles } from 'lucide-react'
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
-import toast from 'react-hot-toast'
 import Markdown from 'react-markdown'
 import { generateArticle } from '../api/ai'
+import { useCancelableRequest } from '../hooks/useCancelableRequest'
+import StopRequestButton from '../components/StopRequestButton'
 
 const WriteArticle = () => {
 
@@ -15,13 +16,10 @@ const WriteArticle = () => {
 
   const [selectedLength, setSelectedLength] = useState(articleLength[0])
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
-  const [generationError, setGenerationError] = useState('')
-  const abortRef = useRef(null)
+  const { loading, stopping, errorMessage, run, stop } = useCancelableRequest()
   const outputRef = useRef(null)
 
-  useEffect(() => () => abortRef.current?.abort(), [])
   useLayoutEffect(() => {
     if (loading && outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight
@@ -32,30 +30,17 @@ const WriteArticle = () => {
 
   const onSubmitHandler = async (e) => {
     e.preventDefault()
-    if (abortRef.current) return
-    const controller = new AbortController()
-    abortRef.current = controller
-    setLoading(true)
-    setContent('')
-    setGenerationError('')
-    try {
+    await run(async ({ signal }) => {
+      setContent('')
       await generateArticle({
         topic: input,
         length: selectedLength.length,
         lengthLabel: selectedLength.text,
         getToken,
-        signal: controller.signal,
-        onChunk: (text) => setContent((current) => current + text),
+        signal,
+        onChunk: (text) => { if (!signal.aborted) setContent((current) => current + text) },
       })
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        setGenerationError(error.message)
-        toast.error(error.message)
-      }
-    } finally {
-      abortRef.current = null
-      setLoading(false)
-    }
+    })
   }
 
   return (
@@ -86,6 +71,7 @@ const WriteArticle = () => {
           }
           Generate article
         </button>
+        {loading && <StopRequestButton onClick={stop} stopping={stopping} />}
       </form>
       {/* right col */}
       <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96 max-h-[600px]'>
@@ -94,7 +80,7 @@ const WriteArticle = () => {
             <h1 className='text-xl font-semibold'>Generated article</h1>
           </div>
 
-          {generationError && <p role='alert' className='mt-3 text-sm text-red-600'>{generationError}</p>}
+          {errorMessage && <p role='alert' className='mt-3 text-sm text-red-600'>{errorMessage}</p>}
 
           {!content ? (
             <div className='flex-1 flex justify-center items-center'>
