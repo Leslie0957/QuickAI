@@ -3,7 +3,6 @@
 基于 React、Vite 和 Tailwind CSS 的 AI 创作界面。
 
 - [项目介绍与在线体验](../README.md)
-- [工程实践记录](../INTERVIEW_NOTES.md)
 
 ## 开发
 

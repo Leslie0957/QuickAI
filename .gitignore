@@ -1,2 +1,6 @@
 node_modules
 .env
+
+# Private project notes
+IMPROVEMENT_PLAN.md
+INTERVIEW_NOTES.md
