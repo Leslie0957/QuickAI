@@ -7,6 +7,7 @@ import fs from 'fs'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
 import { DAILY_IMAGE_LIMIT, currentQuotaDay, getRemainingImages, releaseImage, reserveImage } from '../services/imageQuota.js'
 import { syncPublicProfile } from '../services/publicProfiles.js'
+import { articleContinuationOptions, continuationFilter } from '../services/articleContinuation.js'
 
 const AI =
  new OpenAI({
@@ -20,7 +21,7 @@ const sendEvent = (res, event, data) => {
     }
 }
 
-const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage, prompt = req.body.prompt, storedPrompt = prompt }) => {
+const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage, prompt = req.body.prompt, storedPrompt = prompt, previousContent = '' }) => {
     const { userId } = req.auth()
     const plan = req.plan
     const freeUsage = req.free_usage
@@ -52,7 +53,9 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage,
             if (choice.finish_reason === 'length' && type === 'blog-title') {
                 return res.json({ success: false, message: truncatedMessage })
             }
-            const content = choice.message.content
+            const filter = continuationFilter(previousContent)
+            const generated = choice.message.content || ''
+            const content = previousContent + (previousContent ? filter.push(generated) + filter.finish() : generated)
             await saveCreation(content)
             return res.json({ success: true, content })
         } catch (error) {
@@ -87,25 +90,31 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage,
         }, { signal: abortController.signal })
 
         let content = ''
+        const filter = previousContent ? continuationFilter(previousContent) : null
+        const append = (text) => {
+            if (!text) return
+            content += text
+            sendEvent(res, 'chunk', { text })
+        }
         let finishReason
         for await (const chunk of stream) {
             if (disconnected) return
             const choice = chunk.choices[0]
             const text = choice?.delta?.content
             if (text) {
-                content += text
-                sendEvent(res, 'chunk', { text })
+                append(filter ? filter.push(text) : text)
             }
             if (choice?.finish_reason) finishReason = choice.finish_reason
         }
 
         if (disconnected) return
+        if (filter) append(filter.finish())
         if (finishReason === 'length') throw new Error(truncatedMessage)
         if (!content.trim() || finishReason !== 'stop') {
             throw new Error('Generation did not complete. Please try again.')
         }
 
-        await saveCreation(content)
+        await saveCreation(previousContent + content)
         sendEvent(res, 'done', {})
     } catch (error) {
         if (!disconnected) {
@@ -130,6 +139,13 @@ export const generateBlogTitle = (req, res) => streamTextCreation(req, res, {
     type: 'blog-title',
     truncatedMessage: 'Title generation was cut off. Please try again.'
 })
+
+export const continueArticle = (req, res) => {
+    let options
+    try { options = articleContinuationOptions(req.body) }
+    catch (error) { return res.status(400).json({ success: false, message: error.message }) }
+    return streamTextCreation(req, res, options)
+}
 
 export const getImageQuota = async (req, res) => {
     try {

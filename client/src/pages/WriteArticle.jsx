@@ -2,7 +2,7 @@ import { Edit, Sparkles } from 'lucide-react'
 import React, { useLayoutEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import Markdown from 'react-markdown'
-import { generateArticle } from '../api/ai'
+import { generateArticle, continueArticle } from '../api/ai'
 import { useCancelableRequest } from '../hooks/useCancelableRequest'
 import StopRequestButton from '../components/StopRequestButton'
 
@@ -17,7 +17,8 @@ const WriteArticle = () => {
   const [selectedLength, setSelectedLength] = useState(articleLength[0])
   const [input, setInput] = useState('')
   const [content, setContent] = useState('')
-  const { loading, stopping, errorMessage, run, stop } = useCancelableRequest()
+  const [draftParameters, setDraftParameters] = useState(null)
+  const { loading, stopping, status, errorMessage, run, stop } = useCancelableRequest()
   const outputRef = useRef(null)
 
   useLayoutEffect(() => {
@@ -32,15 +33,26 @@ const WriteArticle = () => {
     e.preventDefault()
     await run(async ({ signal }) => {
       setContent('')
+      const parameters = { topic: input, length: selectedLength.length, lengthLabel: selectedLength.text }
+      setDraftParameters(parameters)
       await generateArticle({
-        topic: input,
-        length: selectedLength.length,
-        lengthLabel: selectedLength.text,
+        ...parameters,
         getToken,
         signal,
         onChunk: (text) => { if (!signal.aborted) setContent((current) => current + text) },
       })
     })
+  }
+
+  const onContinue = async () => {
+    if (!draftParameters || !content.trim()) return
+    await run(({ signal }) => continueArticle({
+      ...draftParameters,
+      previousContent: content,
+      getToken,
+      signal,
+      onChunk: (text) => { if (!signal.aborted) setContent((current) => current + text) },
+    }))
   }
 
   return (
@@ -72,6 +84,12 @@ const WriteArticle = () => {
           Generate article
         </button>
         {loading && <StopRequestButton onClick={stop} stopping={stopping} />}
+        {(status === 'stopped' || status === 'error') && content.trim() && draftParameters && (
+          <button type='button' onClick={onContinue} disabled={loading}
+            className='mt-3 w-full rounded-lg border border-blue-300 px-4 py-2 text-sm text-blue-700 cursor-pointer hover:bg-blue-50 disabled:opacity-50'>
+            Continue generating
+          </button>
+        )}
       </form>
       {/* right col */}
       <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96 max-h-[600px]'>

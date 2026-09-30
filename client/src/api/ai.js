@@ -5,6 +5,10 @@ export const generateArticle = ({ topic, length, lengthLabel, ...options }) => s
   ...options, path: '/api/ai/generate-article',
   data: { prompt: `Write an article about ${topic}. Target length: ${lengthLabel}.`, length },
 })
+export const continueArticle = ({ topic, length, lengthLabel, previousContent, ...options }) => streamCreation({
+  ...options, path: '/api/ai/continue-article',
+  data: { topic, length, lengthLabel, previousContent },
+})
 export const generateBlogTitles = ({ keyword, category, ...options }) => streamCreation({
   ...options, path: '/api/ai/generate-blog-title',
   data: { prompt: `Generate 5 concise blog titles for the keyword "${keyword}" in the ${category} category. Return only a numbered list, without an introduction or bold formatting.` },
