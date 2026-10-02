@@ -3,7 +3,10 @@ import { streamCreation } from './stream.js'
 
 export const generateArticle = ({ topic, length, lengthLabel, ...options }) => streamCreation({
   ...options, path: '/api/ai/generate-article',
-  data: { prompt: `Write an article about ${topic}. Target length: ${lengthLabel}.`, length },
+  data: {
+    prompt: `Write an article about ${topic}. Target length: ${lengthLabel}. Use the same language as the topic unless the topic explicitly requests another language. Format the article as Markdown with a title, section headings, readable paragraphs, and lists where appropriate. Output only the article. Do not wrap it in a code block or add commentary before or after it.`,
+    length,
+  },
 })
 export const continueArticle = ({ topic, length, lengthLabel, previousContent, ...options }) => streamCreation({
   ...options, path: '/api/ai/continue-article',

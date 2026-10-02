@@ -37,7 +37,7 @@ export function articleContinuationOptions(body) {
     // Bound model context without dropping any text from the final saved article.
     const context = previousContent.length <= 16000 ? previousContent
         : `${previousContent.slice(0, 2000)}\n\n[Middle of the draft omitted]\n\n${previousContent.slice(-12000)}`
-    const storedPrompt = `Write an article about ${topic}. Target length: ${lengthLabel}.`
+    const storedPrompt = `Write an article about ${topic}. Target length: ${lengthLabel}. Use the same language as the topic unless the topic explicitly requests another language. Format the article as Markdown with a title, section headings, readable paragraphs, and lists where appropriate. Output only the article. Do not wrap it in a code block or add commentary before or after it.`
     return {
         maxTokens: length >= 1600 ? 10000 : length * 2,
         type: 'article',
