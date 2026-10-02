@@ -7,7 +7,7 @@ import fs from 'fs'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
 import { DAILY_IMAGE_LIMIT, currentQuotaDay, getRemainingImages, releaseImage, reserveImage } from '../services/imageQuota.js'
 import { syncPublicProfile } from '../services/publicProfiles.js'
-import { articleContinuationOptions, continuationFilter } from '../services/articleContinuation.js'
+import { articleContinuationOptions, continuationResponseFilter } from '../services/articleContinuation.js'
 
 const AI =
  new OpenAI({
@@ -53,9 +53,9 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage,
             if (choice.finish_reason === 'length' && type === 'blog-title') {
                 return res.json({ success: false, message: truncatedMessage })
             }
-            const filter = continuationFilter(previousContent)
+            const filter = previousContent ? continuationResponseFilter(previousContent) : null
             const generated = choice.message.content || ''
-            const content = previousContent + (previousContent ? filter.push(generated) + filter.finish() : generated)
+            const content = previousContent + (filter ? filter.push(generated) + filter.finish() : generated)
             await saveCreation(content)
             return res.json({ success: true, content })
         } catch (error) {
@@ -90,7 +90,7 @@ const streamTextCreation = async (req, res, { maxTokens, type, truncatedMessage,
         }, { signal: abortController.signal })
 
         let content = ''
-        const filter = previousContent ? continuationFilter(previousContent) : null
+        const filter = previousContent ? continuationResponseFilter(previousContent) : null
         const append = (text) => {
             if (!text) return
             content += text
